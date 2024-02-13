@@ -72,21 +72,73 @@ resource "azurerm_resource_group" "example" {
   location = "West Europe"
 }
 
-resource "azurerm_storage_account" "usos" {
+resource "azurerm_storage_account" "example" {
   name                     = "kfjsdkfhiehlskd"
   resource_group_name      = azurerm_resource_group.RCreation.name
   location                 = azurerm_resource_group.RCreation.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  account_kind             = "StorageV2"
-  is_hns_enabled           = "true"
 }
 
-resource "azurerm_storage_data_lake_gen2_filesystem" "example" {
-  name               = "example"
-  storage_account_id = azurerm_storage_account.usos.id
 
-  properties = {
-    hello = "aGVsbG8="
+resource "azurerm_data_factory" "example" {
+  name                = "RCreation-data-factory"
+  location            = azurerm_resource_group.RCreation.location
+  resource_group_name = azurerm_resource_group.RCreation.name
+
+  tags = {
+    "terraform"    = "terraform"
+    "environment"  = "Production"
   }
+}
+
+resource "azurerm_data_factory_pipeline" "example" {
+  name               = "RCreation-data-pipeline"
+  data_factory_id     = azurerm_data_factory.example.id
+
+}
+
+resource "azurerm_log_analytics_workspace" "log" {
+  name                = "acctest-01"
+  location            = azurerm_resource_group.RCreation.location
+  resource_group_name = azurerm_resource_group.RCreation.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+
+resource "azurerm_monitor_action_group" "example" {
+  name                = "email_alert"
+  resource_group_name = azurerm_resource_group.example.name
+  short_name          = "email"
+
+    email_receiver {
+    name                    = "sendtoadmin"
+    email_address           = "vikramlatha10@gmail.com"
+    use_common_alert_schema = true
+  }
+}
+
+resource "azurerm_monitor_metric_alert" "metric_alert" {
+  name                = "metricalert"
+  resource_group_name = azurerm_resource_group.RCreation.name
+  scopes              = [azurerm_storage_account.example.id]
+  description         = "Action will be triggered when Transactions count is greater than 50."
+
+  criteria {
+    metric_namespace = "Microsoft.Storage/storageAccounts"
+    metric_name      = "Transactions"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 50
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.example.id  # Use the ID of the action group
+  }
+
+
+  depends_on=[
+  azurerm_monitor_action_group.example,
+  azurerm_storage_account.example]
 }
